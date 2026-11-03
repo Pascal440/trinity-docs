@@ -1,8 +1,8 @@
 > Copie documentaire expurgée pour GitHub. Les adresses publiques, domaines d’exploitation, identité client et chemins propres à l’hôte sont remplacés par des alias. Les SHA, dépendances, diagnostics et limites sont conservés. Le rapport décrit l’état observé lors de sa mission ; voir WORKSPACE02_REPORT.md pour la sauvegarde ultérieure. Les fichiers originaux locaux restent intacts.
 
 # WORKSPACE-01 — Audit de continuité
-Destinataire : Maya, direction stratégique et produit  
-Observation : 3 novembre 2026, vers 11 h 42 (Europe/Paris).  
+Destinataire : Maya, direction stratégique et produit
+Observation : 3 novembre 2026, vers 11 h 42 (Europe/Paris).
 Statut : reconnaissance terminée ; arbitrage requis avant modification.
 
 ## 1. Diagnostic et périmètre
@@ -229,4 +229,3 @@ Priorité proposée : préserver et examiner les livrables FRONT-02.2 locaux, pu
 Aucune fusion, publication, migration, installation, modification runtime ou déploiement autorisé par cette recommandation. Maya arbitre la suite ; l'opérateur conserve la validation des engagements financiers et opérations irréversibles.
 
 Fin de WORKSPACE-01. Aucune seconde mission démarrée.
-

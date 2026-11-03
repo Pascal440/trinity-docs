@@ -44,6 +44,6 @@ La convention permanente est dans ../README.md ; l’index dans ../INDEX.md. Le 
 
 ## État livré et risques résiduels
 
-Code FRONT-02.2 committé et poussé, PR en brouillon ; rapports préparés pour PR documentaire en brouillon. Aucun merge ni déploiement. Aucun redémarrage Docker, migration, changement de configuration active ou nettoyage. Aucune écriture dans trinity-gateway ou trinity-saas-infra. Le commit initial vide sur main de trinity-docs est la seule exception de base, explicitement approuvée.
+Code FRONT-02.2 committé et poussé, PR en brouillon ; rapports sauvegardés sur reports/workspace02-saas pour la PR documentaire en brouillon. Aucun merge ni déploiement. Aucun redémarrage Docker, migration, changement de configuration active ou nettoyage. Aucune écriture dans trinity-gateway ou trinity-saas-infra. Le commit initial vide sur main de trinity-docs est la seule exception de base, explicitement approuvée.
 
 Les validations métier historiques ne valent pas validation commerciale. Les rapports ne contiennent pas les données de récupération ou secrets d’exploitation, qui restent hors GitHub. Une suite nécessite un nouvel arbitrage ; aucune seconde mission automatique.
