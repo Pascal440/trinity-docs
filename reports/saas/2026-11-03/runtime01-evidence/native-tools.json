@@ -1,0 +1,18 @@
+{
+  "operator_driven_not_llm": true,
+  "read_file": [
+    {
+      "input": "01_ventes_fictives.xlsx",
+      "native_read_file_extracts_expected_data": true
+    },
+    {
+      "input": "02_brief_fictif.docx",
+      "native_read_file_extracts_expected_data": true
+    },
+    {
+      "input": "03_couts_fictifs.pdf",
+      "native_read_file_extracts_expected_data": true
+    }
+  ],
+  "run_command_execution_confirmed": true
+}

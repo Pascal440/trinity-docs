@@ -1,0 +1,8 @@
+{
+  "model_list_empty": true,
+  "inference_calls": 0,
+  "guard_process_alive": true,
+  "deadline_observed": false,
+  "deadline_status": "armed, not yet reached",
+  "debug_relay_removed": true
+}

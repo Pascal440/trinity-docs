@@ -1,0 +1,28 @@
+{
+  "webui": {
+    "reference": "ghcr.io/open-webui/open-webui@sha256:9c583de5686ed3f92e992a9326a99225e951047176ccc5644fcd4352b77eb959",
+    "docker_id": "sha256:9c583de5686ed3f92e992a9326a99225e951047176ccc5644fcd4352b77eb959",
+    "architecture": "amd64",
+    "os": "linux",
+    "size_bytes": 872768372,
+    "labels": {
+      "org.opencontainers.image.licenses": "NOASSERTION",
+      "org.opencontainers.image.revision": "c38885a1a737da4968f157092f304f3b5481d0bf",
+      "org.opencontainers.image.source": "https://github.com/open-webui/open-webui",
+      "org.opencontainers.image.version": "0.13.0-slim"
+    }
+  },
+  "terminal": {
+    "reference": "ghcr.io/open-webui/open-terminal@sha256:28adefe59c450e4010862f25300a4c7e023de463779538dbee8818769911c835",
+    "docker_id": "sha256:28adefe59c450e4010862f25300a4c7e023de463779538dbee8818769911c835",
+    "architecture": "amd64",
+    "os": "linux",
+    "size_bytes": 7238714302,
+    "labels": {
+      "org.opencontainers.image.licenses": "MIT",
+      "org.opencontainers.image.revision": "6444534c8aa4bd8acf561bf62cd9eef3e29bd24f",
+      "org.opencontainers.image.source": "https://github.com/open-webui/open-terminal",
+      "org.opencontainers.image.version": "main"
+    }
+  }
+}

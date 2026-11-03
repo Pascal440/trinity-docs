@@ -1,0 +1,15 @@
+{
+  "derived_from_input_documents": true,
+  "llm_outputs_evaluated": false,
+  "revenue_t1": 125000,
+  "revenue_t2": 145000,
+  "revenue_delta": 20000,
+  "revenue_growth_pct": "16.00",
+  "costs_t1": 79000,
+  "costs_t2": 92000,
+  "margin_t1": 46000,
+  "margin_t2": 53000,
+  "margin_t2_pct": "36.55172413793103448275862069",
+  "revenue_target_t2": 150000,
+  "target_gap": -5000
+}

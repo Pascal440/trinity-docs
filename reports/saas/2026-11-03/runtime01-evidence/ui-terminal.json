@@ -1,0 +1,6 @@
+{
+  "operator_driven": true,
+  "command_executed_in_ui": true,
+  "websocket_output_confirmed": true,
+  "full_width_tabs": true
+}

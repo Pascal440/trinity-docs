@@ -1,0 +1,47 @@
+{
+  "checks": [
+    "Open WebUI reports version 0.13.0",
+    "xlsx original downloaded through authenticated WebUI proxy without alteration",
+    "xlsx preview source is original OOXML for native WebUI renderer",
+    "docx original downloaded through authenticated WebUI proxy without alteration",
+    "rendered docx preview is a valid PDF stream",
+    "pdf original downloaded through authenticated WebUI proxy without alteration",
+    "rendered pdf preview is a valid PDF stream",
+    "pptx original downloaded through authenticated WebUI proxy without alteration",
+    "rendered pptx preview is a valid PDF stream"
+  ],
+  "files": [
+    {
+      "extension": "xlsx",
+      "download_bytes": 6806,
+      "sha256": "fcf2cd3f55b41e59d81d9587fb3b3b906595b85316f079402fec16456d43e5eb",
+      "preview_mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "preview_seconds": 0.1,
+      "operator_created_not_llm": true
+    },
+    {
+      "extension": "docx",
+      "download_bytes": 36981,
+      "sha256": "1e47591ecb321235b2ca25aecd2a079e2f517e64e4d83ed854c844aa5bc77e33",
+      "preview_mime": "application/pdf",
+      "preview_seconds": 1.8,
+      "operator_created_not_llm": true
+    },
+    {
+      "extension": "pdf",
+      "download_bytes": 6545,
+      "sha256": "1fcc8e3955de055b42b1314c1fa2c0b268641dcdfb08ea7ac798333dcc03ef1a",
+      "preview_mime": "application/pdf",
+      "preview_seconds": 0.08,
+      "operator_created_not_llm": true
+    },
+    {
+      "extension": "pptx",
+      "download_bytes": 28316,
+      "sha256": "65398eff803f923aa8faab5a2c46f5f458d60f077f583c76f67e2c987b5b7ab1",
+      "preview_mime": "application/pdf",
+      "preview_seconds": 0.62,
+      "operator_created_not_llm": true
+    }
+  ]
+}

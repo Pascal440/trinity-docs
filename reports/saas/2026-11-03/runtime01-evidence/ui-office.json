@@ -1,0 +1,24 @@
+{
+  "results": [
+    {
+      "extension": "xlsx",
+      "preview_opened_from_file_browser": true,
+      "operator_created_not_llm": true
+    },
+    {
+      "extension": "docx",
+      "preview_opened_from_file_browser": true,
+      "operator_created_not_llm": true
+    },
+    {
+      "extension": "pdf",
+      "preview_opened_from_file_browser": true,
+      "operator_created_not_llm": true
+    },
+    {
+      "extension": "pptx",
+      "preview_opened_from_file_browser": true,
+      "operator_created_not_llm": true
+    }
+  ]
+}

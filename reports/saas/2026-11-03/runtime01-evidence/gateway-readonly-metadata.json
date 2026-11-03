@@ -1,0 +1,12 @@
+{
+    "readonly_metadata_only": true,
+    "runtime01_identities": 0,
+    "generic_demo_named_identities": 0,
+    "runtime01_active_unexpired_keys": 0,
+    "active_providers_explicitly_listing_tn27q": 0,
+    "active_providers_explicitly_listing_qwen38": 0,
+    "api_keys_read": false,
+    "provider_credentials_read": false,
+    "inference_calls": 0,
+    "gateway_writes": false
+}
