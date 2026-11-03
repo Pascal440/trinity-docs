@@ -89,3 +89,7 @@ Aucun changement Gateway ou Infra indispensable n’a été identifié. Aucune m
 Portal feature/launch05-commercial-qualification : commit 679d3738cfb5a724bd0125cca52786cfc2d25545 ; [PR technique #14 en brouillon](https://github.com/Pascal440/trinity-saas-portal/pull/14), base feature/launch04-stripe-live / 76a11ded222395633efe5fcc7c14a11c293c1e68. Les preuves nouvelles expurgées sont [consultables à ce commit](https://github.com/Pascal440/trinity-saas-portal/tree/679d3738cfb5a724bd0125cca52786cfc2d25545/docs/launch05/evidence). Aucune image commerciale candidate construite ou déployée.
 
 Branche documentaire reports/launch05-commercial-qualification depuis reports/launch04-stripe-live / edb4b84ad14e7716682ae640d18e82a57dc7b2ff. Le SHA documentaire final est fourni par la PR et le livrable de mission.
+
+## CI GitHub finale
+
+[Portal CI 41644554393](https://github.com/Pascal440/trinity-saas-portal/actions/runs/41644554393), sur 679d3738cfb5a724bd0125cca52786cfc2d25545 : completed / success. Installation Composer/npm, validation, syntaxe, Pint, tests PHP, build, audits et scan de release réussis selon les métadonnées de job vérifiées. Les suites MySQL/HTTP sont les preuves locales isolées ci-dessus, distinctes de la CI applicative ; aucun nombre supplémentaire de tests CI n’est déduit de ce statut.
