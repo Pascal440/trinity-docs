@@ -1,0 +1,11 @@
+{
+  "checks": [
+    "non-admin Desktop UI connected and rendered canvas",
+    "Chrome Browser UI and native actions share the dedicated demo user in the provisional pre-message context"
+  ],
+  "operator_driven_not_llm": true,
+  "local_form_confirmed": true,
+  "chat_context_applied": false,
+  "saved_conversation_tested": false,
+  "llm_tools_tested": false
+}

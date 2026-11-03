@@ -1,0 +1,41 @@
+{
+  "checks": [
+    "dedicated fresh lab account authenticates",
+    "terminal runs non-root without capabilities or privilege escalation",
+    "terminal has read-only rootfs and no host binds or customer volumes",
+    "terminal publishes no Docker port",
+    "webui runs non-root without capabilities or privilege escalation",
+    "webui has read-only rootfs and no host binds or customer volumes",
+    "webui publishes no Docker port",
+    "execution namespace has no external network",
+    "terminal cannot escalate with sudo or access a Docker socket",
+    "terminal cannot reach Internet metadata or host bridge addresses",
+    "installed terminal version is exactly 0.16.0"
+  ],
+  "document_libraries": {
+    "open-terminal": "0.16.0",
+    "openpyxl": "3.1.5",
+    "python-docx": "1.2.0",
+    "python-pptx": "1.0.2",
+    "weasyprint": "70.0",
+    "pandas": "3.1.0",
+    "matplotlib": "3.11.2",
+    "pypdf": "6.21.4"
+  },
+  "network_test": {
+    "uid": 1000,
+    "docker_socket": false,
+    "net_interfaces": [
+      "lo"
+    ],
+    "root_escalation_returncode": 1,
+    "1.1.1.1": "blocked",
+    "169.254.169.254": "blocked",
+    "172.17.0.1": "blocked"
+  },
+  "expires_at": 1793728753.768387,
+  "image_refs": {
+    "webui": "ghcr.io/open-webui/open-webui@sha256:9c583de5686ed3f92e992a9326a99225e951047176ccc5644fcd4352b77eb959",
+    "terminal": "ghcr.io/open-webui/open-terminal@sha256:28adefe59c450e4010862f25300a4c7e023de463779538dbee8818769911c835"
+  }
+}

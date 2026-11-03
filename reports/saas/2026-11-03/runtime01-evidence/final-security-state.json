@@ -1,0 +1,65 @@
+{
+  "checked_at_utc": "2026-11-03T16:43:00.371825+00:00",
+  "existing_services_count": 13,
+  "existing_services_unchanged_images_started_at_restart_counts": true,
+  "existing_healthy_services": 12,
+  "existing_services_without_healthcheck": 1,
+  "lab": [
+    {
+      "name": "runtime01-terminal",
+      "image": "sha256:28adefe59c450e4010862f25300a4c7e023de463779538dbee8818769911c835",
+      "running": true,
+      "oom_killed": false,
+      "user": "1000:1000",
+      "memory_bytes": 2147483648,
+      "pids_limit": 512,
+      "cpu_nanos": 1000000000,
+      "network_mode": "none",
+      "privileged": false,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "rootfs_read_only": true,
+      "no_host_binds": true,
+      "no_docker_published_ports": true,
+      "tmpfs": {
+        "/home/user": "rw,nosuid,nodev,size=536870912,uid=1000,gid=1000,mode=0700",
+        "/run": "rw,nosuid,nodev,size=16777216,uid=1000,gid=1000",
+        "/tmp": "rw,nosuid,nodev,size=268435456,mode=1777"
+      }
+    },
+    {
+      "name": "runtime01-webui",
+      "image": "sha256:9c583de5686ed3f92e992a9326a99225e951047176ccc5644fcd4352b77eb959",
+      "running": true,
+      "oom_killed": false,
+      "user": "1000:1000",
+      "memory_bytes": 1073741824,
+      "pids_limit": 384,
+      "cpu_nanos": 1000000000,
+      "network_mode": "same isolated lab namespace",
+      "privileged": false,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "rootfs_read_only": true,
+      "no_host_binds": true,
+      "no_docker_published_ports": true,
+      "tmpfs": {
+        "/app/backend/data": "rw,nosuid,nodev,size=536870912,uid=1000,gid=1000,mode=0700",
+        "/tmp": "rw,nosuid,nodev,size=134217728,mode=1777"
+      }
+    }
+  ],
+  "private_ui_bind": "127.0.0.1:18760",
+  "debug_relay_retired": true,
+  "lab_auto_stop_at_utc": "2026-11-03T17:59:13.768387+00:00",
+  "external_inference_calls": 0,
+  "external_budget_eur": 0
+}

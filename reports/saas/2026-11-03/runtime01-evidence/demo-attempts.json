@@ -1,0 +1,47 @@
+{
+  "model_access": "not_authorized_or_configured",
+  "external_budget_eur": 0,
+  "inference_calls": 0,
+  "attempts": [
+    {
+      "attempt": 1,
+      "status": "blocked_not_executed",
+      "reason": "No dedicated authorized Gateway identity and no confirmed TN27Q route",
+      "terminal_actions_by_llm": null,
+      "autonomous_repairs": null,
+      "human_interventions_during_trial": null,
+      "numeric_accuracy": null,
+      "artifact_quality": null,
+      "latency_seconds": null,
+      "tokens": null,
+      "estimated_inference_cost": null
+    },
+    {
+      "attempt": 2,
+      "status": "blocked_not_executed",
+      "reason": "No dedicated authorized Gateway identity and no confirmed TN27Q route",
+      "terminal_actions_by_llm": null,
+      "autonomous_repairs": null,
+      "human_interventions_during_trial": null,
+      "numeric_accuracy": null,
+      "artifact_quality": null,
+      "latency_seconds": null,
+      "tokens": null,
+      "estimated_inference_cost": null
+    },
+    {
+      "attempt": 3,
+      "status": "blocked_not_executed",
+      "reason": "No dedicated authorized Gateway identity and no confirmed TN27Q route",
+      "terminal_actions_by_llm": null,
+      "autonomous_repairs": null,
+      "human_interventions_during_trial": null,
+      "numeric_accuracy": null,
+      "artifact_quality": null,
+      "latency_seconds": null,
+      "tokens": null,
+      "estimated_inference_cost": null
+    }
+  ],
+  "operator_smoke_files_are_not_llm_results": true
+}
