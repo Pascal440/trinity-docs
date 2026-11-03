@@ -32,7 +32,7 @@ Node 24.19.0 a été copié depuis le conteneur de preview existant, en lecture 
 
 Les huit scénarios Chromium/Firefox, transparence, responsive et axe proviennent de FRONT-02.2. Aucun navigateur disponible sur l’hôte pour les rejouer pendant WORKSPACE-02. [Résultats historiques JSON](https://github.com/Pascal440/trinity-saas-portal/blob/517f9dc2cf191681cf7bdc0156b85ac6276b4609/docs/front022/TEST_RESULTS.json) ; [protocole et limites](https://github.com/Pascal440/trinity-saas-portal/blob/517f9dc2cf191681cf7bdc0156b85ac6276b4609/docs/front022/REPRODUCIBILITY.md). Captures et vidéos lourdes restent locales. Les scripts navigateur demandent un environnement de test préparé ; ils n’ont pas été lancés contre les previews actives.
 
-Validation visuelle opérateur requise. Aucun audit de performance terrain, paiement, appel IA, restauration ou état financier actuel requalifié. Les checks CI GitHub ne sont pas assimilés aux builds locaux.
+Validation visuelle opérateur requise. Aucun audit de performance terrain, paiement, appel IA, restauration ou état financier actuel requalifié. Les checks CI GitHub ne sont pas assimilés aux builds locaux. Lors du contrôle final, [Portal CI — isolated-tests-and-build](https://github.com/Pascal440/trinity-saas-portal/actions/runs/41624629918) est terminé avec SUCCESS sur le commit 517f9dc2cf191681cf7bdc0156b85ac6276b4609. Les journaux détaillés n’ont pas été audités : aucun nombre de tests CI n’est déduit de ce statut.
 
 ## Centralisation documentaire
 
