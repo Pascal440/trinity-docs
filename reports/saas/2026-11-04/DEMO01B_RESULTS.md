@@ -25,3 +25,7 @@ Le relais regroupe les erreurs HTTP, les erreurs de transport et les réponses n
 ## Référence indépendante
 
 CA de 125 000 € et 145 000 €, coûts de 79 000 € et 92 000 €, marges de 46 000 € et 53 000 €, hausse de CA de 16 %, marge T2 de 36,5517 % et écart à l’objectif T2 de −5 000 €. [Calcul indépendant](demo01a-kit/independent-reference.json)
+
+## Reprise DEMO-01B.1
+
+La sonde sans outil a reçu HTTP 400. Atelier Boréal reste en NO-GO. [Diagnostic, correctif et réservation cumulative](DEMO01B1_DIAGNOSTIC.md).
