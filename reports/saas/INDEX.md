@@ -17,4 +17,6 @@ Date de classement : 2026-11-03 (Europe/Paris). Les rapports décrivent leur ét
 
 | DEMO-01A | [Rapport](2026-11-04/DEMO01A_REPORT.md) · [Runbook](2026-11-04/DEMO01A_RUNBOOK.md) · [Connexion](2026-11-04/DEMO01A_MODEL_CONNECTION.md) · [Scénario](2026-11-04/DEMO01A_SCENARIO.md) | Kit hors ligne vérifié et aperçu Calc validé. Recette LLM en attente d’autorisation | Docs reports/demo01a-preparation depuis a6b3df13fb8cedcfcfb3d2691e091e0ed4e645ff |
 
+| DEMO-01B / OPS-01 | [Démo](2026-11-04/DEMO01B_REPORT.md) · [Résultats](2026-11-04/DEMO01B_RESULTS.md) · [Dockhand](2026-11-04/OPS01_DOCKHAND.md) · [Consoles](2026-11-04/OPS01_ADMIN_INTERFACES.md) · [Décision](2026-11-04/OPS01_DECISION.md) | Isolation et garde vérifiés localement, recette Together bloquée, Dockhand suspendu sur le moteur D8 | Docs reports/demo01b-ops01 depuis 205e230919f366ad349c9788a6b7ef6a81323151 |
+
 [Convention permanente](README.md). Le SHA du commit documentaire est accessible dans la PR et le livrable de mission ; il n’est pas inscrit dans son propre contenu.
