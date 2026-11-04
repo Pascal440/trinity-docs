@@ -1,5 +1,6 @@
 """One-shot, Unix-socket-only Together relay. Never log credentials or prompt content."""
 import argparse
+from contextlib import contextmanager
 from decimal import Decimal
 from http.client import HTTPException, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -19,12 +20,14 @@ MODEL = "Qwen/Qwen3.8-Flash"
 MAX_BODY = 256 * 1024
 MAX_CONTEXT = 1_100_000
 MAX_OUTPUT = 4096
-MAX_CALLS = 8
+MAX_CALLS = 10
+IDLE_SECONDS = 60
+CALL_SECONDS = 240
 INPUT_RATE = Decimal("0.15")
 OUTPUT_RATE = Decimal("0.47")
 OPERATOR_USAGE_USD = (68 * INPUT_RATE + 36 * OUTPUT_RATE) / 1_000_000
 RESERVE = (MAX_CONTEXT * INPUT_RATE + MAX_OUTPUT * OUTPUT_RATE) / 1_000_000
-USD_CAP = Decimal("1.50")
+USD_CAP = Decimal("1.51")
 EUR_CAP = Decimal("5")
 MAX_RESPONSE = 2 * 1024**2
 
@@ -96,10 +99,89 @@ def safe_error_detail(data):
     return {"explanation": "Le motif du fournisseur ne correspond à aucune formulation publiable."}
 
 
-def native_events(response, deadline):
+class StreamMetrics:
+    def __init__(self, session_deadline, idle=IDLE_SECONDS, total=CALL_SECONDS):
+        self.start = time.monotonic()
+        self.last = self.last_useful = self.start
+        self.deadline = min(self.start + total, session_deadline)
+        self.idle = idle
+        self.status = None
+        self.first = None
+        self.events = self.content = self.reasoning = self.tools = 0
+        self.indexes = set()
+        self.finish = self.usage = self.done = False
+
+    def arm(self):
+        when = min(self.deadline, self.last_useful + self.idle)
+        signal.setitimer(signal.ITIMER_REAL, max(0.000001, when - time.monotonic()))
+
+    def expired(self, _signal, _frame):
+        category = ("stream_total_timeout" if self.deadline <= self.last_useful + self.idle
+                    else "stream_idle_timeout")
+        raise UpstreamError(category, self.status)
+
+    @contextmanager
+    def enforce(self):
+        previous = signal.signal(signal.SIGALRM, self.expired)
+        try:
+            self.arm()
+            yield
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, previous)
+
+    def observe(self, event=None, done=False):
+        now = time.monotonic()
+        self.last = now
+        if self.first is None:
+            self.first = now - self.start
+        self.events += 1
+        self.done |= done
+        useful = done
+        if isinstance(event, dict):
+            usage = isinstance(event.get("usage"), dict)
+            self.usage |= usage
+            useful |= usage
+            choices = event.get("choices")
+            for choice in choices if isinstance(choices, list) else ():
+                if not isinstance(choice, dict):
+                    continue
+                finish = bool(choice.get("finish_reason"))
+                self.finish |= finish
+                delta = choice.get("delta")
+                if not isinstance(delta, dict):
+                    useful |= finish
+                    continue
+                content = bool(delta.get("content"))
+                reasoning = bool(delta.get("reasoning") or delta.get("reasoning_content"))
+                calls = delta.get("tool_calls")
+                self.content += content
+                self.reasoning += reasoning
+                if isinstance(calls, list):
+                    self.tools += len(calls)
+                    for fragment in calls:
+                        index = fragment.get("index") if isinstance(fragment, dict) else None
+                        if type(index) in (int, float) and 0 <= index < 64 and index % 1 == 0:
+                            self.indexes.add(int(index))
+                useful |= finish or content or reasoning or bool(calls) or delta.get("role") == "assistant"
+        if useful:
+            self.last_useful = now
+            self.arm()
+
+    def report(self):
+        now = time.monotonic()
+        return {"first_event_seconds": None if self.first is None else round(self.first, 3),
+                "events": self.events, "since_last_event_seconds": round(now - self.last, 3) if self.events else None,
+                "since_last_useful_seconds": round(now - self.last_useful, 3),
+                "content_fragments": self.content, "reasoning_fragments": self.reasoning,
+                "tool_fragments": self.tools, "distinct_tool_indexes": len(self.indexes),
+                "finish_seen": self.finish, "usage_seen": self.usage, "done_seen": self.done}
+
+
+def native_events(response, metrics=None):
     size = 0
     data = []
-    while time.monotonic() < deadline:
+    while True:
         line = response.readline(MAX_RESPONSE - size + 1)
         if not line:
             break
@@ -110,12 +192,17 @@ def native_events(response, deadline):
         if line.startswith(b"data:"):
             data.append(line[5:].lstrip(b" "))
         elif not line and data:
-            event = b"\n".join(data)
+            payload = b"\n".join(data)
             data.clear()
-            if event == b"[DONE]":
+            if payload == b"[DONE]":
+                if metrics:
+                    metrics.observe(done=True)
                 return
-            yield json.loads(event)
-    raise UpstreamError("stream_deadline" if time.monotonic() >= deadline else "stream_missing_done", 200)
+            event = json.loads(payload)
+            if metrics:
+                metrics.observe(event)
+            yield event
+    raise UpstreamError("stream_missing_done", 200)
 
 
 def tool_error(subcode, fragment=None, index=None):
@@ -200,8 +287,8 @@ def assemble_stream(events):
             "choices": [{"message": message, "finish_reason": finish}]}
 
 
-def request_upstream(key, method, path, body=None):
-    connection = HTTPSConnection(HOST, timeout=60)
+def request_upstream(key, method, path, body=None, metrics=None):
+    connection = HTTPSConnection(HOST, timeout=CALL_SECONDS if metrics else IDLE_SECONDS)
     status = None
     try:
         connection.request(method, path, body, {
@@ -211,10 +298,12 @@ def request_upstream(key, method, path, body=None):
         })
         response = connection.getresponse()
         status = response.status
+        if metrics:
+            metrics.status = status
         if status == 200 and method == "POST":
             if response.headers.get_content_type() != "text/event-stream":
                 raise UpstreamError("incompatible_stream_content_type", status)
-            return assemble_stream(native_events(response, time.monotonic() + 60))
+            return assemble_stream(native_events(response, metrics))
         data = response.read(MAX_RESPONSE + 1)
         if status != 200:
             raise UpstreamError("provider_http", status, code=provider_code(data), detail=safe_error_detail(data))
@@ -290,21 +379,23 @@ def validate_response(response, upstream, context):
     return usage
 
 
-def completion(key, upstream, budget, context):
+def completion(key, upstream, budget, context, deadline):
     start = time.monotonic()
+    metrics = StreamMetrics(deadline)
     try:
-        response = request_upstream(key, "POST", "/v1/chat/completions", json.dumps(upstream))
-        usage = validate_response(response, upstream, context)
+        with metrics.enforce():
+            response = request_upstream(key, "POST", "/v1/chat/completions", json.dumps(upstream), metrics)
+            usage = validate_response(response, upstream, context)
     except UpstreamError as error:
         budget.closed = True
         print(json.dumps({"call": budget.calls, "reserved_usd": str(budget.usd),
-                          "seconds": round(time.monotonic()-start, 3), **error.fields}), flush=True)
+                          "seconds": round(time.monotonic()-start, 3), **error.fields, **metrics.report()}), flush=True)
         return None
     measured = (usage["prompt_tokens"] * INPUT_RATE + usage["completion_tokens"] * OUTPUT_RATE) / 1_000_000
     print(json.dumps({"call": budget.calls, "http_status": 200,
                       "prompt_tokens": usage["prompt_tokens"], "completion_tokens": usage["completion_tokens"],
                       "estimated_usd_ceiling": str(measured), "reserved_usd": str(budget.usd),
-                      "seconds": round(time.monotonic()-start, 3)}), flush=True)
+                      "seconds": round(time.monotonic()-start, 3), "category": "complete", **metrics.report()}), flush=True)
     return response
 
 
@@ -453,7 +544,7 @@ def handler(key, local_token, budget, context, deadline, record_reservation):
                 budget.closed = True
                 self.json_reply(503, {"error": "réservation non enregistrée, session fermée"})
                 return
-            response = completion(key, upstream, budget, context)
+            response = completion(key, upstream, budget, context, deadline)
             if response is None:
                 self.json_reply(502, {"error": "fournisseur non qualifié, session fermée"})
                 return
@@ -490,7 +581,13 @@ def resume_budget(args):
         f"DEMO-01B.3 scenario starts at call count 4 with USD reserve {3 * RESERVE + OPERATOR_USAGE_USD}"
     ):
         raise ValueError("Verrou DEMO-01B.3 requis.")
-    budget = Budget(args.eur_per_usd_inclusive, 5, OPERATOR_USAGE_USD)
+    b4 = args.budget_lock.with_name("budget.demo01b4.scenario")
+    b4_call = args.budget_lock.with_name("budget.demo01b4.call-6")
+    if (read_private_file(b4) != f"DEMO-01B.4 scenario starts at call count 5 with USD reserve {4 * RESERVE + OPERATOR_USAGE_USD}"
+            or read_private_file(b4_call) != f"DEMO-01B.4 call 6 cumulative USD reserve {5 * RESERVE + OPERATOR_USAGE_USD}"
+            or any(args.budget_lock.with_name(f"budget.demo01b4.call-{n}").exists() for n in (7, 8))):
+        raise ValueError("Historique DEMO-01B.4 inattendu.")
+    budget = Budget(args.eur_per_usd_inclusive, 6, OPERATOR_USAGE_USD)
     if budget.usd + (MAX_CALLS - budget.calls) * RESERVE >= EUR_CAP / budget.factor:
         raise ValueError("Budget de reprise insuffisant.")
     return budget
@@ -516,8 +613,8 @@ def main():
     except Exception:
         raise SystemExit("Clé, catalogue ou budget non qualifiés. Aucune inférence.") from None
     try:
-        write_marker(args.budget_lock.with_name("budget.demo01b4.scenario"),
-                     f"DEMO-01B.4 scenario starts at call count {budget.calls} with USD reserve {budget.usd}")
+        write_marker(args.budget_lock.with_name("budget.demo01b5.scenario"),
+                     f"DEMO-01B.5 scenario starts at call count {budget.calls} with USD reserve {budget.usd}")
     except (OSError, ValueError):
         raise SystemExit("Autorisation de reprise absente ou déjà utilisée.") from None
 
@@ -527,8 +624,8 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     deadline = time.monotonic() + 1200
     def record_reservation(current):
-        write_marker(args.budget_lock.with_name(f"budget.demo01b4.call-{current.calls}"),
-                     f"DEMO-01B.4 call {current.calls} cumulative USD reserve {current.usd}")
+        write_marker(args.budget_lock.with_name(f"budget.demo01b5.call-{current.calls}"),
+                     f"DEMO-01B.5 call {current.calls} cumulative USD reserve {current.usd}")
 
     bound = False
     try:

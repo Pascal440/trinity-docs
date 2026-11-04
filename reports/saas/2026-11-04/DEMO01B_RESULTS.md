@@ -41,3 +41,7 @@ Together a répondu HTTP 200 en streaming à V1. La validation des fragments d�
 ## Reprise DEMO-01B.4
 
 V1 a atteint le délai du flux après HTTP 200. Aucun outil exécuté ni fichier généré. [Diagnostic détaillé](DEMO01B4_TOOL_CALLS.md).
+
+## Reprise DEMO-01B.5
+
+Le flux V1 est resté actif 208,851 s, puis le relais a rejeté un identifiant de fragment outil. [Mesures, délais et budget](DEMO01B5_SSE_TIMEOUTS.md).

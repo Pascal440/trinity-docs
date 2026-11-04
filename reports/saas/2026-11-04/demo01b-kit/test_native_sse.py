@@ -2,6 +2,7 @@
 from io import BytesIO
 import json
 import time
+import socket
 import unittest
 
 import together_relay as relay
@@ -34,7 +35,7 @@ TOOL_SHAPE = [
 
 class NativeSSETests(unittest.TestCase):
     def parse(self, events, done=True):
-        return relay.assemble_stream(relay.native_events(fixture(events, done), time.monotonic() + 5))
+        return relay.assemble_stream(relay.native_events(fixture(events, done)))
 
     def test_operator_shape(self):
         response = self.parse(OPERATOR_SHAPE)
@@ -92,6 +93,29 @@ class NativeSSETests(unittest.TestCase):
                                         "tools": [{"function": {"name": n}} for n in names]}, 100)
             self.assertEqual(error.exception.fields["tool_subcode"], code)
             self.assertNotIn("private", str(error.exception.fields))
+
+    def test_blocking_read_deadlines(self):
+        for idle, total, category in [
+            (0.04, 0.5, "stream_idle_timeout"), (0.5, 0.04, "stream_total_timeout")
+        ]:
+            with self.subTest(category=category):
+                left, right = socket.socketpair()
+                with left, right, left.makefile("rb") as blocked:
+                    metrics = relay.StreamMetrics(time.monotonic() + 2, idle, total)
+                    with self.assertRaises(relay.UpstreamError) as error, metrics.enforce():
+                        list(relay.native_events(blocked, metrics))
+                    self.assertEqual(error.exception.fields["category"], category)
+
+    def test_structural_metrics(self):
+        metrics = relay.StreamMetrics(time.monotonic() + 5)
+        with metrics.enforce():
+            list(relay.native_events(fixture(OPERATOR_SHAPE), metrics))
+        report = metrics.report()
+        self.assertEqual(report["events"], 5)
+        self.assertEqual(report["content_fragments"], 2)
+        self.assertEqual(report["reasoning_fragments"], 1)
+        self.assertTrue(report["finish_seen"] and report["usage_seen"] and report["done_seen"])
+        self.assertNotIn("private fixture", str(report))
 
     def test_interruption_and_model_mismatch(self):
         with self.assertRaises(relay.UpstreamError) as error:
