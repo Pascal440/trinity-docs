@@ -2,7 +2,13 @@
 
 4 novembre 2026, heure de Paris. Base documentaire `reports/demo01a-preparation` au commit `205e230919f366ad349c9788a6b7ef6a81323151`, [PR DEMO-01A #7](https://github.com/Pascal440/trinity-docs/pull/7).
 
-**Recette réelle bloquée par l’absence d’identité Together dédiée. Dépense d’inférence de la mission de 0 €.**
+**Recette réelle tentée. Le relais s’est fermé au premier appel amont et aucun livrable n’a été généré.**
+
+L’opérateur a autorisé l’utilisation d’une copie privée de la clé existante et confirmé la désactivation de la recharge automatique. Le catalogue authentifié a accepté le modèle et les tarifs attendus. Le modèle a été rendu visible uniquement au compte de démonstration par un droit local. Les deux messages ont été envoyés via l’API de conversation d’Open WebUI et ont le même identifiant de chat. Les métriques et la limite du diagnostic sont consignées dans les [résultats](DEMO01B_RESULTS.md). Les deux conteneurs temporaires et l’accès fournisseur ont été retirés après collecte. Le verrou de budget a été conservé.
+
+## Préparation historique
+
+Lors de la préparation, aucun accès Together utilisable n’avait été trouvé et aucune inférence n’avait été lancée.
 
 La recherche s’est limitée à la présence de `TOGETHER_API_KEY`, de `/run/secrets/together_api_key` et de `/home/codex/.config/demo01b/together.key`. Aucun accès utilisable dans ce périmètre. L’opérateur doit déposer une clé autorisée pour cette mission dans le dernier fichier, appartenant à `codex` et en mode `0600`. Une notification lui a indiqué le chemin. Aucun appel au catalogue authentifié. Together publie `Qwen/Qwen3.8-Flash` comme ID serverless, à confirmer dans le catalogue actif de l’identité fournie. Le tarif public consulté est 0,15 USD/M tokens d’entrée et 0,47 USD/M de sortie. [Fiche modèle](https://www.together.ai/models/qwen3-8-flash) · [Tarifs](https://www.together.ai/pricing).
 
