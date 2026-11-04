@@ -15,4 +15,6 @@ Date de classement : 2026-11-03 (Europe/Paris). Les rapports décrivent leur ét
 
 | RUNTIME-01 | [Rapport](2026-11-03/RUNTIME01_REPORT.md) · [Compatibilité](2026-11-03/RUNTIME01_COMPATIBILITY.md) · [Résultats](2026-11-03/RUNTIME01_DEMO_RESULTS.md) · [Sécurité](2026-11-03/RUNTIME01_SECURITY.md) · [Décision](2026-11-03/RUNTIME01_DECISION.md) | Laboratoire technique WebUI 0.13.0 / Terminal 0.16.0 qualifié ; démonstration LLM bloquée, budget externe 0 € | Docs reports/runtime01-lab depuis reports/launch06-release-candidate / 5f1f6072bcbd5ca587b18fac84250e497fed8b12 ; aucun dépôt technique publié |
 
+| DEMO-01A | [Rapport](2026-11-04/DEMO01A_REPORT.md) · [Runbook](2026-11-04/DEMO01A_RUNBOOK.md) · [Connexion](2026-11-04/DEMO01A_MODEL_CONNECTION.md) · [Scénario](2026-11-04/DEMO01A_SCENARIO.md) | Kit hors ligne vérifié et aperçu Calc validé. Recette LLM en attente d’autorisation | Docs reports/demo01a-preparation depuis a6b3df13fb8cedcfcfb3d2691e091e0ed4e645ff |
+
 [Convention permanente](README.md). Le SHA du commit documentaire est accessible dans la PR et le livrable de mission ; il n’est pas inscrit dans son propre contenu.

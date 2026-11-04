@@ -1,0 +1,14 @@
+{
+  "enabled": false,
+  "approval_reference": null,
+  "upstream_https_base_url": null,
+  "upstream_model_id": null,
+  "allowed_requests": ["GET /v1/models", "POST /v1/chat/completions"],
+  "allow_redirects": false,
+  "allow_fallback": false,
+  "max_concurrent_requests": 1,
+  "approved_max_requests": null,
+  "approved_max_output_tokens_per_request": null,
+  "approved_budget_eur": 0,
+  "expires_at": null
+}
