@@ -33,3 +33,7 @@ La sonde sans outil a reçu HTTP 400. Atelier Boréal reste en NO-GO. [Diagnosti
 ## Reprise DEMO-01B.2
 
 La sonde bornée a reçu HTTP 400. Le diagnostic expurgé identifie le paramètre `stream`. [Comparaison des requêtes et résultat](DEMO01B2_DIAGNOSTIC.md).
+
+## Reprise DEMO-01B.3
+
+Together a répondu HTTP 200 en streaming à V1. La validation des fragments d’appel d’outil a fermé le relais. [Correctif, preuve et budget](DEMO01B3_STREAMING.md).

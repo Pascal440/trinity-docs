@@ -22,6 +22,7 @@ MAX_OUTPUT = 4096
 MAX_CALLS = 8
 INPUT_RATE = Decimal("0.15")
 OUTPUT_RATE = Decimal("0.47")
+OPERATOR_USAGE_USD = (68 * INPUT_RATE + 36 * OUTPUT_RATE) / 1_000_000
 RESERVE = (MAX_CONTEXT * INPUT_RATE + MAX_OUTPUT * OUTPUT_RATE) / 1_000_000
 USD_CAP = Decimal("1.50")
 EUR_CAP = Decimal("5")
@@ -95,6 +96,86 @@ def safe_error_detail(data):
     return {"explanation": "Le motif du fournisseur ne correspond à aucune formulation publiable."}
 
 
+def native_events(response, deadline):
+    size = 0
+    data = []
+    while time.monotonic() < deadline:
+        line = response.readline(MAX_RESPONSE - size + 1)
+        if not line:
+            break
+        size += len(line)
+        if size > MAX_RESPONSE:
+            raise UpstreamError("response_size", 200)
+        line = line.rstrip(b"\r\n")
+        if line.startswith(b"data:"):
+            data.append(line[5:].lstrip(b" "))
+        elif not line and data:
+            event = b"\n".join(data)
+            data.clear()
+            if event == b"[DONE]":
+                return
+            yield json.loads(event)
+    raise UpstreamError("stream_deadline" if time.monotonic() >= deadline else "stream_missing_done", 200)
+
+
+def assemble_stream(events):
+    content = []
+    tools = {}
+    usage = finish = identifier = None
+    for event in events:
+        if not isinstance(event, dict) or event.get("error"):
+            raise UpstreamError("stream_error_event", 200)
+        if event.get("model") not in (None, MODEL):
+            raise UpstreamError("incompatible_model", 200)
+        if event.get("model") == MODEL:
+            identifier = event.get("id") or identifier
+        choices = event.get("choices")
+        if not isinstance(choices, list) or len(choices) > 1:
+            raise UpstreamError("incompatible_choices", 200)
+        if event.get("usage") is not None:
+            usage = event["usage"]
+        if not choices:
+            continue
+        choice = choices[0]
+        if not isinstance(choice, dict) or choice.get("index", 0) != 0:
+            raise UpstreamError("incompatible_choices", 200)
+        finish = choice.get("finish_reason") or finish
+        delta = choice.get("delta") or {}
+        if not isinstance(delta, dict) or delta.get("role") not in (None, "assistant"):
+            raise UpstreamError("incompatible_message", 200)
+        text = delta.get("content")
+        if text is not None:
+            if not isinstance(text, str):
+                raise UpstreamError("incompatible_message", 200)
+            content.append(text)
+        fragments = delta.get("tool_calls") or []
+        if not isinstance(fragments, list):
+            raise UpstreamError("incompatible_tool_calls", 200)
+        for part in fragments:
+            if (not isinstance(part, dict) or type(part.get("index")) is not int
+                    or not 0 <= part["index"] < 64 or part.get("type") not in (None, "function")):
+                raise UpstreamError("incompatible_tool_calls", 200)
+            tool = tools.setdefault(part["index"], {"type": "function", "function": {"name": "", "arguments": ""}})
+            if part.get("id") is not None:
+                if not isinstance(part["id"], str) or tool.get("id", part["id"]) != part["id"]:
+                    raise UpstreamError("incompatible_tool_calls", 200)
+                tool["id"] = part["id"]
+            function = part.get("function") or {}
+            if not isinstance(function, dict):
+                raise UpstreamError("incompatible_tool_calls", 200)
+            for field in ("name", "arguments"):
+                value = function.get(field)
+                if value is not None:
+                    if not isinstance(value, str):
+                        raise UpstreamError("incompatible_tool_calls", 200)
+                    tool["function"][field] += value
+    message = {"role": "assistant", "content": "".join(content) or None}
+    if tools:
+        message["tool_calls"] = [tools[index] for index in sorted(tools)]
+    return {"id": identifier, "model": MODEL if identifier else None, "usage": usage,
+            "choices": [{"message": message, "finish_reason": finish}]}
+
+
 def request_upstream(key, method, path, body=None):
     connection = HTTPSConnection(HOST, timeout=60)
     status = None
@@ -102,10 +183,14 @@ def request_upstream(key, method, path, body=None):
         connection.request(method, path, body, {
             "Authorization": "Bearer " + key,
             "Content-Type": "application/json",
-            "Accept": "application/json",
+            "Accept": "text/event-stream" if method == "POST" else "application/json",
         })
         response = connection.getresponse()
         status = response.status
+        if status == 200 and method == "POST":
+            if response.headers.get_content_type() != "text/event-stream":
+                raise UpstreamError("incompatible_stream_content_type", status)
+            return assemble_stream(native_events(response, time.monotonic() + 60))
         data = response.read(MAX_RESPONSE + 1)
         if status != 200:
             raise UpstreamError("provider_http", status, code=provider_code(data), detail=safe_error_detail(data))
@@ -231,15 +316,16 @@ def normalize(payload):
     upstream = dict(payload, max_tokens=output)
     for field in ("stream", "stream_options", "n"):
         upstream.pop(field, None)
+    upstream["stream"] = True
     return upstream
 
 
 class Budget:
-    def __init__(self, eur_per_usd_inclusive, prior_calls=0):
+    def __init__(self, eur_per_usd_inclusive, prior_calls=0, operator_usd=Decimal(0)):
         if not eur_per_usd_inclusive.is_finite() or not 0 < eur_per_usd_inclusive <= Decimal("3"):
             raise ValueError("Borne EUR/USD frais et taxes inclus non confirmée.")
         self.calls = prior_calls
-        self.usd = RESERVE * prior_calls
+        self.usd = RESERVE * (prior_calls - bool(operator_usd)) + operator_usd
         self.factor = eur_per_usd_inclusive
         self.closed = False
 
@@ -342,7 +428,10 @@ def resume_budget(args):
     if any(args.budget_lock.with_name(name).exists()
            for name in ("budget.demo01b1.pass", "budget.demo01b1.scenario")):
         raise ValueError("État de reprise historique inattendu.")
-    return Budget(args.eur_per_usd_inclusive, 2 if args.probe else 3)
+    previous = args.budget_lock.with_name("budget.demo01b2.probe")
+    if read_private_file(previous) != f"DEMO-01B.2 cumulative USD reserve {3 * RESERVE}":
+        raise ValueError("Réservation DEMO-01B.2 requise.")
+    return Budget(args.eur_per_usd_inclusive, 4, OPERATOR_USAGE_USD)
 
 
 def main():
@@ -350,45 +439,23 @@ def main():
     parser.add_argument("--key-file", required=True, type=Path)
     parser.add_argument("--local-token-file", type=Path)
     parser.add_argument("--socket", type=Path)
-    parser.add_argument("--probe", action="store_true")
     parser.add_argument("--eur-per-usd-inclusive", required=True, type=Decimal)
     parser.add_argument("--budget-lock", required=True, type=Path)
     parser.add_argument("--confirm-one-session", action="store_true", required=True)
     args = parser.parse_args()
-    if not args.probe and (not args.local_token_file or not args.socket or not args.socket.is_absolute() or args.socket.parent.stat().st_mode & 0o007
+    if (not args.local_token_file or not args.socket or not args.socket.is_absolute() or args.socket.parent.stat().st_mode & 0o007
             or not args.socket.parent.is_dir() or args.socket.exists()):
         parser.error("Socket neuve dans un répertoire privé requise.")
     try:
         budget = resume_budget(args)
         key = private_text(args.key_file)
-        token = None if args.probe else private_text(args.local_token_file)
+        token = private_text(args.local_token_file)
         context = approved_catalog(request_upstream(key, "GET", "/v1/models"))
     except Exception:
         raise SystemExit("Clé, catalogue ou budget non qualifiés. Aucune inférence.") from None
-    probe_marker = args.budget_lock.with_name("budget.demo01b2.probe")
-    pass_marker = args.budget_lock.with_name("budget.demo01b2.pass")
     try:
-        if args.probe:
-            upstream = normalize({"model": MODEL, "max_tokens": 64, "messages": [
-                {"role": "user", "content": "Réponds uniquement : connexion OK"},
-            ]})
-            budget.reserve()
-            write_marker(probe_marker, f"DEMO-01B.2 cumulative USD reserve {budget.usd}")
-            response = completion(key, upstream, budget, context)
-            if response is None:
-                raise SystemExit(2)
-            content = response["choices"][0]["message"].get("content") or ""
-            if content.strip() != "connexion OK":
-                print(json.dumps({"category": "probe_unexpected_text"}), flush=True)
-                raise SystemExit(2)
-            write_marker(pass_marker, "DEMO-01B.2 probe confirmed exact text and valid usage")
-            print(json.dumps({"probe": "pass", "expected_text_matched": True}), flush=True)
-            return
-        if (read_private_file(probe_marker) != f"DEMO-01B.2 cumulative USD reserve {budget.usd}"
-                or read_private_file(pass_marker) != "DEMO-01B.2 probe confirmed exact text and valid usage"):
-            raise ValueError("Sonde réussie requise.")
-        write_marker(args.budget_lock.with_name("budget.demo01b2.scenario"),
-                     f"DEMO-01B.2 scenario starts with USD reserve {budget.usd}")
+        write_marker(args.budget_lock.with_name("budget.demo01b3.scenario"),
+                     f"DEMO-01B.3 scenario starts at call count {budget.calls} with USD reserve {budget.usd}")
     except (OSError, ValueError):
         raise SystemExit("Autorisation de reprise absente ou déjà utilisée.") from None
 
