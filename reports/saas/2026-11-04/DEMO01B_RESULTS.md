@@ -29,3 +29,7 @@ CA de 125 000 € et 145 000 €, coûts de 79 000 € et 92 000 €, marges de 
 ## Reprise DEMO-01B.1
 
 La sonde sans outil a reçu HTTP 400. Atelier Boréal reste en NO-GO. [Diagnostic, correctif et réservation cumulative](DEMO01B1_DIAGNOSTIC.md).
+
+## Reprise DEMO-01B.2
+
+La sonde bornée a reçu HTTP 400. Le diagnostic expurgé identifie le paramètre `stream`. [Comparaison des requêtes et résultat](DEMO01B2_DIAGNOSTIC.md).

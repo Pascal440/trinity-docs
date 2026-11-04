@@ -5,6 +5,7 @@ from http.client import HTTPException, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import signal
@@ -43,9 +44,9 @@ def private_text(path):
 
 
 class UpstreamError(Exception):
-    def __init__(self, category, status=None, kind=None, code=None):
+    def __init__(self, category, status=None, kind=None, code=None, detail=None):
         self.fields = {"category": category, "http_status": status,
-                       "exception": kind or type(self).__name__, "provider_code": code}
+                       "exception": kind or type(self).__name__, "provider_code": code, **(detail or {})}
 
 
 SAFE_CODES = {
@@ -68,6 +69,32 @@ def provider_code(data):
     return None
 
 
+PUBLIC_PARAMS = ("max_tokens", "stream", "n", "model", "messages", "tools", "tool_choice",
+                 "temperature", "top_p", "stop", "reasoning")
+
+
+def safe_error_detail(data):
+    # Match known reasons in memory and emit only fixed paraphrases. Never persist arbitrary text.
+    try:
+        error = json.loads(data)["error"]
+        message = error.get("message")
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return {}
+    if not isinstance(message, str):
+        return {}
+    if re.search(r"credit balance|insufficient (?:funds|credits|balance)|out of credits|add (?:more )?(?:credits|funds)|payment required|billing|balance.{0,30}(?:low|negative|insufficient|zero)", message, re.I):
+        return {"explanation": "Le fournisseur signale un problème de solde ou de facturation."}
+    if re.search(r"(?:not available|does not exist|not found|not supported|no access).{0,40}model|model.{0,180}(?:not available|does not exist|not found|not supported|no access|not have access)", message, re.I):
+        return {"parameter": "model", "explanation": "Le fournisseur signale un modèle indisponible, non pris en charge ou inaccessible."}
+    for parameter in PUBLIC_PARAMS:
+        field = re.escape(parameter)
+        if error.get("param") == parameter or re.search(
+            rf"""(?:['`"]{field}['`"]|\b{field}\b\s*(?:is |must |should |cannot |expects |:))""", message, re.I
+        ):
+            return {"parameter": parameter, "explanation": "Le fournisseur signale ce paramètre dans son erreur de validation."}
+    return {"explanation": "Le motif du fournisseur ne correspond à aucune formulation publiable."}
+
+
 def request_upstream(key, method, path, body=None):
     connection = HTTPSConnection(HOST, timeout=60)
     status = None
@@ -81,7 +108,7 @@ def request_upstream(key, method, path, body=None):
         status = response.status
         data = response.read(MAX_RESPONSE + 1)
         if status != 200:
-            raise UpstreamError("provider_http", status, code=provider_code(data))
+            raise UpstreamError("provider_http", status, code=provider_code(data), detail=safe_error_detail(data))
         if len(data) > MAX_RESPONSE:
             raise UpstreamError("response_size", status)
         return json.loads(data)
@@ -201,8 +228,9 @@ def normalize(payload):
     output = payload.get("max_tokens", MAX_OUTPUT)
     if type(output) is not int or not 0 < output <= MAX_OUTPUT:
         raise ValueError("Plafond de sortie dépassé.")
-    upstream = dict(payload, max_tokens=output, stream=False, n=1)
-    upstream.pop("stream_options", None)
+    upstream = dict(payload, max_tokens=output)
+    for field in ("stream", "stream_options", "n"):
+        upstream.pop(field, None)
     return upstream
 
 
@@ -308,7 +336,13 @@ def resume_budget(args):
         raise ValueError("Verrou historique requis.")
     if read_private_file(args.budget_lock) != "One DEMO-01B session reserved. No credential or prompt.":
         raise ValueError("Verrou historique inattendu.")
-    return Budget(args.eur_per_usd_inclusive, 1 if args.probe else 2)
+    prior = args.budget_lock.with_name("budget.demo01b1.probe")
+    if read_private_file(prior) != f"DEMO-01B.1 cumulative USD reserve {2 * RESERVE}":
+        raise ValueError("Réservation DEMO-01B.1 requise.")
+    if any(args.budget_lock.with_name(name).exists()
+           for name in ("budget.demo01b1.pass", "budget.demo01b1.scenario")):
+        raise ValueError("État de reprise historique inattendu.")
+    return Budget(args.eur_per_usd_inclusive, 2 if args.probe else 3)
 
 
 def main():
@@ -331,15 +365,15 @@ def main():
         context = approved_catalog(request_upstream(key, "GET", "/v1/models"))
     except Exception:
         raise SystemExit("Clé, catalogue ou budget non qualifiés. Aucune inférence.") from None
-    probe_marker = args.budget_lock.with_name("budget.demo01b1.probe")
-    pass_marker = args.budget_lock.with_name("budget.demo01b1.pass")
+    probe_marker = args.budget_lock.with_name("budget.demo01b2.probe")
+    pass_marker = args.budget_lock.with_name("budget.demo01b2.pass")
     try:
         if args.probe:
             upstream = normalize({"model": MODEL, "max_tokens": 64, "messages": [
                 {"role": "user", "content": "Réponds uniquement : connexion OK"},
             ]})
             budget.reserve()
-            write_marker(probe_marker, f"DEMO-01B.1 cumulative USD reserve {budget.usd}")
+            write_marker(probe_marker, f"DEMO-01B.2 cumulative USD reserve {budget.usd}")
             response = completion(key, upstream, budget, context)
             if response is None:
                 raise SystemExit(2)
@@ -347,14 +381,14 @@ def main():
             if content.strip() != "connexion OK":
                 print(json.dumps({"category": "probe_unexpected_text"}), flush=True)
                 raise SystemExit(2)
-            write_marker(pass_marker, "DEMO-01B.1 probe confirmed exact text and valid usage")
+            write_marker(pass_marker, "DEMO-01B.2 probe confirmed exact text and valid usage")
             print(json.dumps({"probe": "pass", "expected_text_matched": True}), flush=True)
             return
-        if (read_private_file(probe_marker) != f"DEMO-01B.1 cumulative USD reserve {budget.usd}"
-                or read_private_file(pass_marker) != "DEMO-01B.1 probe confirmed exact text and valid usage"):
+        if (read_private_file(probe_marker) != f"DEMO-01B.2 cumulative USD reserve {budget.usd}"
+                or read_private_file(pass_marker) != "DEMO-01B.2 probe confirmed exact text and valid usage"):
             raise ValueError("Sonde réussie requise.")
-        write_marker(args.budget_lock.with_name("budget.demo01b1.scenario"),
-                     f"DEMO-01B.1 scenario starts with USD reserve {budget.usd}")
+        write_marker(args.budget_lock.with_name("budget.demo01b2.scenario"),
+                     f"DEMO-01B.2 scenario starts with USD reserve {budget.usd}")
     except (OSError, ValueError):
         raise SystemExit("Autorisation de reprise absente ou déjà utilisée.") from None
 
