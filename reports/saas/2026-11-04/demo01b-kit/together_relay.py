@@ -118,6 +118,21 @@ def native_events(response, deadline):
     raise UpstreamError("stream_deadline" if time.monotonic() >= deadline else "stream_missing_done", 200)
 
 
+def tool_error(subcode, fragment=None, index=None):
+    detail = {"tool_subcode": subcode}
+    if type(index) is int and 0 <= index < 64:
+        detail["tool_index"] = index
+    if isinstance(fragment, dict):
+        detail["field_types"] = {
+            field: type(fragment[field]).__name__
+            for field in ("index", "id", "type", "function", "name", "arguments")
+            if field in fragment
+        }
+    elif fragment is not None:
+        detail["fragment_type"] = type(fragment).__name__
+    return UpstreamError("incompatible_tool_calls", 200, detail=detail)
+
+
 def assemble_stream(events):
     content = []
     tools = {}
@@ -148,26 +163,35 @@ def assemble_stream(events):
             if not isinstance(text, str):
                 raise UpstreamError("incompatible_message", 200)
             content.append(text)
-        fragments = delta.get("tool_calls") or []
+        fragments = delta.get("tool_calls")
+        if fragments is None:
+            continue
         if not isinstance(fragments, list):
-            raise UpstreamError("incompatible_tool_calls", 200)
+            raise tool_error("tool_fragment_not_object", fragments)
         for part in fragments:
-            if (not isinstance(part, dict) or type(part.get("index")) is not int
-                    or not 0 <= part["index"] < 64 or part.get("type") not in (None, "function")):
-                raise UpstreamError("incompatible_tool_calls", 200)
-            tool = tools.setdefault(part["index"], {"type": "function", "function": {"name": "", "arguments": ""}})
+            if not isinstance(part, dict):
+                raise tool_error("tool_fragment_not_object", part)
+            index = part.get("index")
+            if type(index) not in (int, float) or not 0 <= index < 64 or index % 1 != 0:
+                raise tool_error("tool_index_missing_or_invalid", part)
+            index = int(index)
+            if part.get("type") not in (None, "function"):
+                raise tool_error("tool_type_invalid", part, index)
+            tool = tools.setdefault(index, {"type": "function", "function": {"name": "", "arguments": ""}})
             if part.get("id") is not None:
-                if not isinstance(part["id"], str) or tool.get("id", part["id"]) != part["id"]:
-                    raise UpstreamError("incompatible_tool_calls", 200)
+                if not isinstance(part["id"], str) or not part["id"] or tool.get("id", part["id"]) != part["id"]:
+                    raise tool_error("tool_id_invalid_or_conflicting", part, index)
                 tool["id"] = part["id"]
-            function = part.get("function") or {}
+            function = part.get("function")
+            if function is None:
+                continue
             if not isinstance(function, dict):
-                raise UpstreamError("incompatible_tool_calls", 200)
+                raise tool_error("tool_function_invalid", part, index)
             for field in ("name", "arguments"):
                 value = function.get(field)
                 if value is not None:
                     if not isinstance(value, str):
-                        raise UpstreamError("incompatible_tool_calls", 200)
+                        raise tool_error(f"tool_{field}_fragment_invalid", function, index)
                     tool["function"][field] += value
     message = {"role": "assistant", "content": "".join(content) or None}
     if tools:
@@ -209,6 +233,10 @@ def request_upstream(key, method, path, body=None):
         connection.close()
 
 
+def reject_json_constant(_value):
+    raise ValueError("Non-JSON constant")
+
+
 def validate_response(response, upstream, context):
     if not isinstance(response, dict) or response.get("model") != MODEL:
         raise UpstreamError("incompatible_model", 200)
@@ -231,14 +259,34 @@ def validate_response(response, upstream, context):
     calls = message.get("tool_calls")
     if calls is not None:
         names = [tool["function"].get("name") for tool in upstream.get("tools", [])]
-        if not isinstance(calls, list) or any(
-            not isinstance(call, dict) or call.get("type") != "function"
-            or not isinstance(call.get("id"), str) or not isinstance(call.get("function"), dict)
-            or not isinstance(call["function"].get("name"), str) or call["function"]["name"] not in names
-            or not isinstance(call["function"].get("arguments"), str)
-            for call in calls
-        ):
-            raise UpstreamError("incompatible_tool_calls", 200)
+        if not isinstance(calls, list):
+            raise tool_error("tool_fragment_not_object", calls)
+        ids = set()
+        for index, call in enumerate(calls):
+            if not isinstance(call, dict):
+                raise tool_error("tool_fragment_not_object", call, index)
+            if call.get("type") != "function":
+                raise tool_error("tool_type_invalid", call, index)
+            identifier = call.get("id")
+            if not isinstance(identifier, str) or not identifier or identifier in ids:
+                raise tool_error("tool_id_invalid_or_conflicting", call, index)
+            ids.add(identifier)
+            function = call.get("function")
+            if not isinstance(function, dict):
+                raise tool_error("tool_function_invalid", call, index)
+            name = function.get("name")
+            if not isinstance(name, str):
+                raise tool_error("tool_name_fragment_invalid", function, index)
+            if name not in names:
+                raise tool_error("tool_name_not_allowed", function, index)
+            arguments = function.get("arguments")
+            if not isinstance(arguments, str):
+                raise tool_error("tool_arguments_fragment_invalid", function, index)
+            try:
+                if not isinstance(json.loads(arguments, parse_constant=reject_json_constant), dict):
+                    raise ValueError
+            except (ValueError, RecursionError):
+                raise tool_error("tool_arguments_json_invalid", function, index) from None
     return usage
 
 
@@ -351,7 +399,7 @@ class UnixServer(HTTPServer):
         return connection, address
 
 
-def handler(key, local_token, budget, context, deadline):
+def handler(key, local_token, budget, context, deadline, record_reservation):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_args):
             pass
@@ -399,6 +447,12 @@ def handler(key, local_token, budget, context, deadline):
             except (ValueError, TypeError):
                 self.json_reply(400, {"error": "requête ou budget refusé"})
                 return
+            try:
+                record_reservation(budget)
+            except OSError:
+                budget.closed = True
+                self.json_reply(503, {"error": "réservation non enregistrée, session fermée"})
+                return
             response = completion(key, upstream, budget, context)
             if response is None:
                 self.json_reply(502, {"error": "fournisseur non qualifié, session fermée"})
@@ -431,7 +485,15 @@ def resume_budget(args):
     previous = args.budget_lock.with_name("budget.demo01b2.probe")
     if read_private_file(previous) != f"DEMO-01B.2 cumulative USD reserve {3 * RESERVE}":
         raise ValueError("Réservation DEMO-01B.2 requise.")
-    return Budget(args.eur_per_usd_inclusive, 4, OPERATOR_USAGE_USD)
+    historical = args.budget_lock.with_name("budget.demo01b3.scenario")
+    if read_private_file(historical) != (
+        f"DEMO-01B.3 scenario starts at call count 4 with USD reserve {3 * RESERVE + OPERATOR_USAGE_USD}"
+    ):
+        raise ValueError("Verrou DEMO-01B.3 requis.")
+    budget = Budget(args.eur_per_usd_inclusive, 5, OPERATOR_USAGE_USD)
+    if budget.usd + (MAX_CALLS - budget.calls) * RESERVE >= EUR_CAP / budget.factor:
+        raise ValueError("Budget de reprise insuffisant.")
+    return budget
 
 
 def main():
@@ -454,8 +516,8 @@ def main():
     except Exception:
         raise SystemExit("Clé, catalogue ou budget non qualifiés. Aucune inférence.") from None
     try:
-        write_marker(args.budget_lock.with_name("budget.demo01b3.scenario"),
-                     f"DEMO-01B.3 scenario starts at call count {budget.calls} with USD reserve {budget.usd}")
+        write_marker(args.budget_lock.with_name("budget.demo01b4.scenario"),
+                     f"DEMO-01B.4 scenario starts at call count {budget.calls} with USD reserve {budget.usd}")
     except (OSError, ValueError):
         raise SystemExit("Autorisation de reprise absente ou déjà utilisée.") from None
 
@@ -464,9 +526,13 @@ def main():
 
     signal.signal(signal.SIGTERM, stop)
     deadline = time.monotonic() + 1200
+    def record_reservation(current):
+        write_marker(args.budget_lock.with_name(f"budget.demo01b4.call-{current.calls}"),
+                     f"DEMO-01B.4 call {current.calls} cumulative USD reserve {current.usd}")
+
     bound = False
     try:
-        with UnixServer(str(args.socket), handler(key, token, budget, context, deadline)) as server:
+        with UnixServer(str(args.socket), handler(key, token, budget, context, deadline, record_reservation)) as server:
             bound = True
             args.socket.chmod(0o660)
             server.timeout = 0.5

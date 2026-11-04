@@ -55,6 +55,44 @@ class NativeSSETests(unittest.TestCase):
         self.assertEqual(error.exception.fields["category"], "incompatible_tool_calls")
         self.assertEqual(done, "data: [DONE]")
 
+    def test_single_and_parallel_calls(self):
+        def call(index, name):
+            return {"index": index, "id": f"call_{index}", "type": "function",
+                    "function": {"name": name, "arguments": "{}"}}
+
+        upstream = {"max_tokens": 64, "tools": [{"function": {"name": name}} for name in ("one", "two")]}
+        for calls in ([call(0, "one")], [call(1.0, "two") | {"id": "call_1"}, call(0, "one")]):
+            response = self.parse([chunk({"tool_calls": calls}, "tool_calls"), USAGE])
+            relay.validate_response(response, upstream, 100)
+            self.assertEqual([c["id"] for c in response["choices"][0]["message"]["tool_calls"]],
+                             [f"call_{i}" for i in range(len(calls))])
+
+    def test_tool_structure_diagnostics(self):
+        base = {"index": 0, "id": "fixture", "type": "function",
+                "function": {"name": "execute", "arguments": '{"private":'}}
+        fixtures = [
+            (42, "tool_fragment_not_object"),
+            ({k: v for k, v in base.items() if k != "index"}, "tool_index_missing_or_invalid"),
+            (dict(base, index=0.5), "tool_index_missing_or_invalid"),
+            (dict(base, type="other"), "tool_type_invalid"),
+            (dict(base, id=[]), "tool_id_invalid_or_conflicting"),
+            (dict(base, function=[]), "tool_function_invalid"),
+            (dict(base, function={"name": 1}), "tool_name_fragment_invalid"),
+            (dict(base, function={"arguments": {}}), "tool_arguments_fragment_invalid"),
+        ]
+        for fragment, code in fixtures:
+            with self.subTest(code=code), self.assertRaises(relay.UpstreamError) as error:
+                self.parse([chunk({"tool_calls": [fragment]}, "tool_calls"), USAGE])
+            self.assertEqual(error.exception.fields["tool_subcode"], code)
+
+        response = self.parse([chunk({"tool_calls": [base]}, "tool_calls"), USAGE])
+        for names, code in [([], "tool_name_not_allowed"), (["execute"], "tool_arguments_json_invalid")]:
+            with self.subTest(code=code), self.assertRaises(relay.UpstreamError) as error:
+                relay.validate_response(response, {"max_tokens": 64,
+                                        "tools": [{"function": {"name": n}} for n in names]}, 100)
+            self.assertEqual(error.exception.fields["tool_subcode"], code)
+            self.assertNotIn("private", str(error.exception.fields))
+
     def test_interruption_and_model_mismatch(self):
         with self.assertRaises(relay.UpstreamError) as error:
             self.parse(OPERATOR_SHAPE, done=False)

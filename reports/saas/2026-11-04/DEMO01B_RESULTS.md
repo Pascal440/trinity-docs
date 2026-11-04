@@ -37,3 +37,7 @@ La sonde bornée a reçu HTTP 400. Le diagnostic expurgé identifie le paramètr
 ## Reprise DEMO-01B.3
 
 Together a répondu HTTP 200 en streaming à V1. La validation des fragments d’appel d’outil a fermé le relais. [Correctif, preuve et budget](DEMO01B3_STREAMING.md).
+
+## Reprise DEMO-01B.4
+
+V1 a atteint le délai du flux après HTTP 200. Aucun outil exécuté ni fichier généré. [Diagnostic détaillé](DEMO01B4_TOOL_CALLS.md).
